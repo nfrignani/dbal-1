@@ -749,6 +749,97 @@ class DB2Platform extends AbstractPlatform
         // Todo OVER() needs ORDER BY data!
         $sql = 'SELECT db22.* FROM (SELECT ROW_NUMBER() OVER() AS DC_ROWNUM, db21.* '.
                'FROM (' . $query . ') db21) db22 WHERE db22.DC_ROWNUM BETWEEN ' . ($offset+1) .' AND ' . ($offset+$limit);
+                /**
+                 * NFRIGNANI
+                 */
+                $query = $sql;
+                $orderBy = stristr ( $query, 'ORDER BY' );
+        //echo  $orderBy.'\n';
+                if (! $orderBy) {
+                        return $sql;
+                } else {
+                        // Remove ORDER BY from $query
+                        $query = preg_replace ( '/\s+ORDER\s+BY\s+([^\)]*)/', '', $query );
+
+                        // Clear ORDER BY
+                        $orderBy = preg_replace ( '/ORDER\s+BY\s+([^\)]*)(.*)/', '$1', $orderBy );
+
+                //      echo $orderBy.'\n';
+
+                        $orderByParts = explode ( ',', $orderBy );
+                        $orderbyColumns = array ();
+
+                        // Split ORDER BY into parts
+                        foreach ( $orderByParts as &$part ) {
+
+                                if (preg_match ( '/(([^\s]*)\.)?([^\.\s]*)\s*(ASC|DESC)?/i', trim ( $part ), $matches )) {
+                                        $orderbyColumns [] = array (
+                                                        'column' => $matches [3],
+                                                        'hasTable' => (! empty ( $matches [2] )),
+                                                        'sort' => isset ( $matches [4] ) ? $matches [4] : null,
+                                                        'table' => empty ( $matches [2] ) ? '[^\.\s]*' : $matches [2]
+                                        );
+                                }
+                        }
+
+
+        //              print_r($orderbyColumns);
+                        $isWrapped = (preg_match ( '/SELECT DISTINCT .* FROM \(.*\) dctrn_result/', $query )) ? true : false;
+
+                        //echo 'iswrapped'.$isWrapped;
+                        // Find alias for each colum used in ORDER BY
+                        if (! empty ( $orderbyColumns )) {
+                                foreach ( $orderbyColumns as $column ) {
+
+                                /*$pattern = sprintf ( '/%s\.%s\s+(?:AS\s+)?([^,\s)]+)/i', $column ['table'], $column ['column'] );
+                                        //echo $pattern;
+                                        
+                                        if ($isWrapped) {
+                                                $overColumn = preg_match ( $pattern, $orderBy, $matches ) ? $matches [1] : '';
+                                        } else {
+                                                echo $query;
+                                                if (preg_match ( $pattern, $orderBy, $matches )){
+                                                        print_r( $matches);
+                                                        if ($column ['hasTable']){
+                                                                echo 'hastable';
+                                                                $overColumn= $column ['table'] . '.' . $column ['column'];
+                                                        }else{
+                                                                echo 'else inside';
+                                                                $overColumn=  $column ['column'];
+                                                        }
+                                                }else{
+                                                        echo 'else outside';
+                                                        $overColumn=$column ['column'];                                                 
+                                                }*/
+                                                //$overColumn = preg_match ( $pattern, $query, $matches ) ? ($column ['hasTable'] ? $column ['table'] . '.' : '') . $column ['column'] : $column ['column'];
+
+         $overColumn=  $column ['column'];
+
+                                        //}
+
+
+                                        //echo $overColumn.'----';
+                                        if (isset ( $column ['sort'] )) {
+                                                $overColumn .= ' ' . $column ['sort'];
+                                        }
+
+                                        //echo $overColumn.'----';
+                                        $overColumns [] = $overColumn;
+                                }
+                        }
+                        // Replace only first occurrence of FROM with $over to prevent
+                        // changing
+                        // FROM also in subqueries.
+                //      print_r($overColumns);
+                        $over = 'ORDER BY ' . implode ( ', ', $overColumns );
+                        $query = preg_replace ( '/OVER\(\)/i', " OVER ($over) ", $query, 1 );
+                        //echo $query;
+                        $sql = $query;
+                }
+                /**
+                 * END NFRIGNANI
+                 */
+
 
         return $sql;
     }
