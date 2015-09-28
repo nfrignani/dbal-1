@@ -100,12 +100,21 @@ class DB2Connection implements Connection, ServerInfoAwareConnection
      */
     public function quote($input, $type=\PDO::PARAM_STR)
     {
+    /* 
         $input = db2_escape_string($input);
         if ($type == \PDO::PARAM_INT) {
             return $input;
         } else {
             return "'".$input."'";
         }
+    */
+        if (is_int($input) || is_float($input)) {
+            return $input;
+        }
+        $input = str_replace("'", "''", $input);
+
+        return "'" . addcslashes($input, "\000\n\r\\\032") . "'";
+
     }
 
     /**
